@@ -292,6 +292,7 @@ class EditPolicy(WidgetPolicy):
     }
     type_widgets = {
         sat.String:     twf.TextField,
+        sat.Text:       twf.TextArea,
         sat.Integer:    twf.TextField(validator=twc.IntValidator),
         sat.DateTime:   twd.CalendarDateTimePicker,
         sat.Date:       twd.CalendarDatePicker,
