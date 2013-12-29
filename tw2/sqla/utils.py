@@ -1,4 +1,5 @@
 import sqlalchemy as sa
+import inspect
 
 
 def is_relation(prop):
@@ -53,6 +54,73 @@ def is_onetomany(prop):
     return True
 
 
+def set_with_relationship(obj, key, value):
+    def _adapt_type(value, primary_key):
+        if isinstance(primary_key.type, sa.Integer):
+            return int(value)
+        return value
+
+    mapper = sa.orm.object_mapper(obj)
+    prop = mapper.get_property(key)
+
+    if not isinstance(prop, sa.orm.PropertyLoader):
+        setattr(obj, key, value)
+        return
+
+    target = prop.argument
+    if inspect.isfunction(target):
+        target = target()
+
+    # TODO what if its None
+    #if not value:
+
+    if prop.uselist and isinstance(value, list):
+        target_obj = []
+        for v in value:
+            try:
+                sa.orm.object_mapper(v)
+                target_obj.append(v)
+            except sa.orm.exc.UnmappedInstanceError:
+                if hasattr(target, 'primary_key'):
+                    pk = target.primary_key
+                else:
+                    pk = sa.orm.class_mapper(target).primary_key
+                if isinstance(v, basestring) and "/" in v:
+                    v = map(_adapt_type, v.split("/"), pk)
+                    v = tuple(v)
+                else:
+                    v = _adapt_type(v, pk[0])
+                #only add those items that come back
+                new_v = target.query.get(v)
+                if new_v is not None:
+                    target_obj.append(new_v)
+    elif prop.uselist:
+        try:
+            sa.orm.object_mapper(value)
+            target_obj = [value]
+        except sa.orm.exc.UnmappedInstanceError:
+            mapper = target
+            if not isinstance(target, sa.orm.Mapper):
+                mapper = sa.orm.class_mapper(target)
+            if isinstance(mapper.primary_key[0].type, sa.Integer):
+                value = int(value)
+            target_obj = [target.query.get(value)]
+    else:
+        try:
+            sa.orm.object_mapper(value)
+            target_obj = value
+        except sa.orm.exc.UnmappedInstanceError:
+            if isinstance(value, basestring) and "/" in value:
+                value = map(_adapt_type, value.split("/"), prop.remote_side)
+                value = tuple(value)
+            else:
+                value = _adapt_type(value, list(prop.remote_side)[0])
+            target_obj = target.query.get(value)
+
+    setattr(obj, key, target_obj)
+
+
+
 def from_dict(obj, data, protect_prm_tamp=True):
     """
     Update a mapped object with data from a JSON-style nested dict/list
@@ -91,7 +159,7 @@ def from_dict(obj, data, protect_prm_tamp=True):
                 if is_onetoone(prop) and old_v is not None:
                     # Delete the old value from the DB
                     old_v.query.delete()
-            setattr(obj, key, value)
+            set_with_relationship(obj, key, value)
 
     return obj
 
