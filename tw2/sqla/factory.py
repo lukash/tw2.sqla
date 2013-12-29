@@ -223,9 +223,13 @@ class WidgetPolicy(object):
         elif prop.key in cls.name_widgets:
             widget = cls.name_widgets[prop.key]
         else:
-            for t, c in product(cls.type_widgets, cols):
-                if isinstance(c.type, t):
-                    widget = cls.type_widgets[t]
+            # The keys in `type_widgets` are classes that can inherit from each
+            # other. Sort them topologically to ensure subclasses come first.
+            widget_types = sorted(cls.type_widgets.items(),
+                key=lambda k:k[0].mro()[::-1], reverse = True)
+            for t, c in product(widget_types, cols):
+                if isinstance(c.type, t[0]):
+                    widget = t[1]
                     break
             else:
                 if not cls.default_widget:
