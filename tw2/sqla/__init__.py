@@ -1,10 +1,11 @@
 from widgets import (
     RelatedValidator, DbFormPage, DbListForm, DbListPage, DbLinkField, 
     commit_veto, transactional_session,
-    DbSelectionField, DbSingleSelectField, DbCheckBoxList, DbRadioButtonList, DbCheckBoxTable,
+    DbSelectionField, DbSingleSelectionField, DbMultipleSelectionField,
+    DbSingleSelectField, DbCheckBoxList, DbRadioButtonList, DbCheckBoxTable,
     DbSingleSelectLink, DbLabelField)
 from factory import (
-    WidgetPolicy, ViewPolicy, EditPolicy,
+    WidgetPolicy, ViewPolicy, EditPolicy, AutoContainer,
     AutoTableForm, AutoViewGrid, AutoGrowingGrid,
     AutoListPage, AutoListPageEdit,
     AutoEditFieldSet, AutoViewFieldSet,
