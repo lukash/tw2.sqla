@@ -150,11 +150,14 @@ class WidgetPolicy(object):
         widget_kw = {}
         factory_widget = None
         cols = getattr(prop, 'columns', [])
+
         if cls.hint_name:
             if is_relation(prop):
                 widget = prop.info.get(cls.hint_name)
             elif cols:
                 widget = cols[0].info.get(cls.hint_name)
+
+        # TODO bogus
         if widget:
             if issubclass(widget, NoWidget):
                 # We don't want to display this field!
@@ -165,63 +168,9 @@ class WidgetPolicy(object):
 
         if widget:
             pass
-        elif is_onetomany(prop):
-            if not cls.onetomany_widget:
-                raise twc.WidgetError(
-                    "Cannot automatically create a widget " +
-                    "for one-to-many relation '%s'" % prop.key)
-            prop_cls = prop.mapper.class_
-            edit_link = getattr(prop_cls, 'tws_edit_link', None)
-            if cls.add_edit_link:
-                widget_kw['link'] = edit_link
-            widget_kw.update({
-                'entity': prop_cls,
-            })
-            widget = cls.onetomany_widget
-        elif sum([c.primary_key for c in getattr(prop, 'columns', [])]):
-            widget = cls.pkey_widget
-        elif is_manytoone(prop):
-            if not cls.manytoone_widget:
-                raise twc.WidgetError(
-                    "Cannot automatically create a widget " +
-                    "for many-to-one relation '%s'" % prop.key)
-            widget_kw = {
-                'entity': prop.mapper.class_
-            }
-            widget = cls.manytoone_widget
-        elif is_manytomany(prop):
-            # Use the same widget as onetomany
-            if not cls.onetomany_widget:
-                raise twc.WidgetError(
-                    "Cannot automatically create a widget " +
-                    "for many-to-many relation '%s'" % prop.key)
-            prop_cls = prop.mapper.class_
-            edit_link = getattr(prop_cls, 'tws_edit_link', None)
-            if cls.add_edit_link:
-                widget_kw['link'] = edit_link
-
-            widget = cls.onetomany_widget
-            widget_kw.update({
-                'id': prop.key,
-                'entity': prop_cls,
-                'reverse_property_name': get_reverse_property_name(prop),
-            })
-        elif is_onetoone(prop):
-            if not cls.onetoone_widget:
-                raise twc.WidgetError(
-                    "Cannot automatically create a widget " +
-                    "for one-to-one relation '%s'" % prop.key)
-            required = required_widget(prop)
-            widget = cls.onetoone_widget
-            widget_kw = {
-                'id': prop.key,
-                'entity': prop.mapper.class_,
-                'required': required,
-                'reverse_property_name': get_reverse_property_name(prop),
-                'required_on_parent': (not required),
-            }
         elif prop.key in cls.name_widgets:
             widget = cls.name_widgets[prop.key]
+            if not widget: return None
         else:
             # The keys in `type_widgets` are classes that can inherit from each
             # other. Sort them topologically to ensure subclasses come first.
@@ -230,13 +179,69 @@ class WidgetPolicy(object):
             for t, c in product(widget_types, cols):
                 if isinstance(c.type, t[0]):
                     widget = t[1]
+                    if not widget: return None
                     break
-            else:
-                if not cls.default_widget:
-                    raise twc.WidgetError(
-                        "Cannot automatically create a widget " +
-                        "for '%s'" % prop.key)
-                widget = cls.default_widget
+
+        if is_onetomany(prop):
+            if not widget:
+                widget = cls.onetomany_widget
+                if not widget: return None
+
+            prop_cls = prop.mapper.class_
+            edit_link = getattr(prop_cls, 'tws_edit_link', None)
+            if cls.add_edit_link:
+                widget_kw['link'] = edit_link
+            widget_kw.update({
+                'entity': prop_cls,
+            })
+        elif sum([c.primary_key for c in getattr(prop, 'columns', [])]):
+            widget = cls.pkey_widget
+            if not widget: return None
+        elif is_manytoone(prop):
+            if not widget:
+                widget = cls.manytoone_widget
+                if not widget: return None
+
+            widget_kw = {
+                'entity': prop.mapper.class_
+            }
+            widget = cls.manytoone_widget
+        elif is_manytomany(prop):
+            # Use the same widget as onetomany
+            if not widget:
+                widget = cls.onetomany_widget
+                if not widget: return None
+
+            prop_cls = prop.mapper.class_
+            edit_link = getattr(prop_cls, 'tws_edit_link', None)
+            if cls.add_edit_link:
+                widget_kw['link'] = edit_link
+
+            widget_kw.update({
+                'id': prop.key,
+                'entity': prop_cls,
+                'reverse_property_name': get_reverse_property_name(prop),
+            })
+        elif is_onetoone(prop):
+            if not widget:
+                widget = cls.onetoone_widget
+                if not widget: return None
+
+            required = required_widget(prop)
+            widget_kw = {
+                'id': prop.key,
+                'entity': prop.mapper.class_,
+                'required': required,
+                'reverse_property_name': get_reverse_property_name(prop),
+                'required_on_parent': (not required),
+            }
+
+        if not widget:
+            if not cls.default_widget:
+                raise twc.WidgetError(
+                    "Cannot automatically create a widget " +
+                    "for '%s'" % prop.key)
+            widget = cls.default_widget
 
         if widget:
             widget_kw['id'] = prop.key
